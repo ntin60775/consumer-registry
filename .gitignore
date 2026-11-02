@@ -1,0 +1,8 @@
+# OntoShip-слой юнита — остаётся локальным (решение оператора 2026-11-02)
+.agents/
+.zcode/
+docs/
+tickets/
+.gitmark/
+*-map.html
+.scratch/

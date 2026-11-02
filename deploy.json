@@ -2,7 +2,13 @@
   "contract_version": 1,
   "strategy": "replace",
   "mappings": [
-    { "from": "skills/consumer-registry", "to": ".zcode/skills/consumer-registry" }
+    { "from": "skills/consumer-registry", "to": ".zcode/skills/consumer-registry" },
+    { "from": "templates", "to": ".zcode/registry/templates" },
+    { "from": "scripts", "to": ".zcode/registry/scripts" }
   ],
-  "on_drift": "fail"
+  "on_drift": "fail",
+  "preflight": [ { "command": "python3 --version" } ],
+  "post_update": [
+    { "say": "Реестр потребителей: скопируй .zcode/registry/templates/registry.template.json в .zcode/registry.local.json, добавь строку из .zcode/registry/templates/gitignore.snippet в .gitignore, заполни machine/project по факту. Правила ведения — навык consumer-registry." }
+  ]
 }

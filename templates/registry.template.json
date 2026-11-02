@@ -1,0 +1,17 @@
+{
+  "schema": "consumer-registry/1",
+  "machine": {
+    "hostname": "hostname-этой-машины",
+    "operator": "имя-оператора"
+  },
+  "project": {
+    "name": "имя-проекта-производителя",
+    "path": "/путь/к/репо/проекта",
+    "description": "Одна строка о проекте-производителе"
+  },
+  "updated_at": "1970-01-01T00:00:00Z",
+  "consumers": [],
+  "deploy_log": [],
+  "acceptance": [],
+  "notes": "Каркас: скопируй в .zcode/registry.local.json, заполни machine и project по факту. Журналы append-only: отменённый шаг — новая запись, не правка старой."
+}

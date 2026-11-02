@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "consumer-registry-1",
+  "title": "Реестр потребителей проекта (consumer-registry/1)",
+  "description": "Машино-локальный реестр потребителей ПРОЕКТА: кто и на чём потребляет, акты раскаток и приёмок, незакрытые обязательства. Живёт ВНЕ git (<проект>/.zcode/registry.local.json), не переносится между машинами. Правила: (1) запись — после каждого акта: раскатка/обновление/снятие у потребителя, приёмка, доклад потребителя; (2) deploy_log и acceptance — append-only, отменённый шаг — новая запись, не правка старой; (3) followups с done=false — незакрытые обязательства, сверять перед следующей поставкой; (4) версии у потребителя подтверждать его источником истины (deployed.json, пин каталога), реестр хранит факт и процесс, не историю версий; (5) ломающие изменения — новая версия consumer-registry/2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "machine", "project", "updated_at", "consumers", "deploy_log"],
+  "properties": {
+    "schema": { "const": "consumer-registry/1" },
+    "machine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostname"],
+      "properties": {
+        "hostname": { "type": "string", "description": "машина, где живёт реестр (репо производителя); файл машино-локален" },
+        "operator": { "type": "string", "description": "владелец машины (имя, не креды)" }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "description": "имя проекта-производителя (= имя плагина в каталоге)" },
+        "path": { "type": "string", "description": "путь репо на этой машине" },
+        "description": { "type": "string" }
+      }
+    },
+    "updated_at": { "type": "string", "description": "ISO 8601 момент последней записи" },
+    "consumers": {
+      "type": "array",
+      "description": "Потребители проекта. Актуальное состояние — здесь, история — в журналах.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "kind", "version", "state"],
+        "properties": {
+          "name": { "type": "string", "description": "имя проекта/машины-потребителя" },
+          "kind": { "type": "string", "enum": ["project", "global"], "description": "project — установлен в проект (канал project); global — канал global на машине" },
+          "machine": { "type": "string", "description": "машина потребителя, если известна" },
+          "path": { "type": "string", "description": "путь потребителя, если локален" },
+          "version": { "type": "string", "description": "потребляемый пин (vX.Y.Z)" },
+          "since": { "type": "string", "description": "ISO дата первого принятия" },
+          "state": { "type": "string", "enum": ["active", "stale", "removed"], "description": "stale — потребитель жив, версия отстала; removed — снят (запись остаётся)" },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "deploy_log": {
+      "type": "array",
+      "description": "Журнал актов поставки/раскатки — append-only.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["at", "actor", "action", "result"],
+        "properties": {
+          "at": { "type": "string" },
+          "actor": { "type": "string", "description": "агент/сессия/оператор" },
+          "action": { "type": "string", "description": "release X / rollout N / update N / remove N / backfill" },
+          "consumer": { "type": "string" },
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "result": { "type": "string", "enum": ["ok", "partial", "failed"] },
+          "followups": {
+            "type": "array",
+            "description": "Незакрытые обязательства (рестарт сессии потребителя, say-шаги, приёмка владельцем) — сверять перед следующей поставкой.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "owner", "done"],
+              "properties": {
+                "kind": { "type": "string" },
+                "owner": { "type": "string", "description": "human / agent / consumer:<имя>" },
+                "done": { "type": "boolean" },
+                "note": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "acceptance": {
+      "type": "array",
+      "description": "Журнал приёмок потребителями/владельцем — append-only.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["at", "consumer", "kind", "result"],
+        "properties": {
+          "at": { "type": "string" },
+          "consumer": { "type": "string" },
+          "kind": { "type": "string", "description": "owner-acceptance / doctor / e2e / smoke" },
+          "result": { "type": "string", "enum": ["green", "warn", "red"] },
+          "details": { "type": "string" }
+        }
+      }
+    },
+    "notes": { "type": "string" }
+  }
+}
