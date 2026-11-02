@@ -1,6 +1,6 @@
 ---
 name: consumer-registry
-description: Реестр потребителей проекта — машино-локальный .zcode/registry.local.json вне git: кто и на чём потребляет проект, append-only журналы раскаток (deploy_log) и приёмок (acceptance), followups с done=false перед следующей поставкой. Контракт consumer-registry/1; схема и каркас в .zcode/registry/templates, валидатор — scripts/registry_check.py.
+description: "Реестр потребителей проекта — машино-локальный .zcode/registry.local.json вне git: кто и на чём потребляет проект, append-only журналы раскаток (deploy_log) и приёмок (acceptance), followups с done=false перед следующей поставкой. Контракт consumer-registry/1; схема и каркас в .zcode/registry/templates, валидатор — .zcode/registry/scripts/registry_check.py."
 when_to_use: после каждого акта поставки/раскатки/снятия у потребителя; после приёмки; перед выпуском новой версии — сверка парка потребителей и незакрытых followups; на вопрос «кто и на какой версии нас использует».
 license: MIT
 metadata: { concern: process, contract: consumer-registry/1 }

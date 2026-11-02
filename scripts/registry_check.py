@@ -20,6 +20,7 @@ Exit codes: 0 — valid; 1 — validation errors; 2 — usage, I/O or JSON error
 from __future__ import annotations
 
 import json
+import re
 import sys
 from datetime import date, datetime
 from pathlib import Path
@@ -31,31 +32,47 @@ TYPE_CHECKS = {
     "array": lambda v: isinstance(v, list),
     "string": lambda v: isinstance(v, str),
     "boolean": lambda v: isinstance(v, bool),
-    "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
+    # draft-07: any number with a zero fractional part is an integer (1.0 too)
+    "integer": lambda v: (isinstance(v, int) and not isinstance(v, bool))
+    or (isinstance(v, float) and v.is_integer()),
     "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
     "null": lambda v: v is None,
 }
+
+TIMESTAMP_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$"
+)
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def json_equal(a, b):
+    """JSON equality: booleans are distinct from numbers (bool subclasses int)."""
+    if isinstance(a, bool) != isinstance(b, bool):
+        return False
+    return a == b
 
 
 def validate_node(instance, schema, path, errors):
     """Validate instance against the draft-07 keyword subset of the schema."""
     expected = schema.get("type")
     if expected is not None:
-        check = TYPE_CHECKS.get(expected)
-        if check is None:
+        # draft-07 allows a union of types: ["integer", "null"]
+        types = expected if isinstance(expected, list) else [expected]
+        checks = [TYPE_CHECKS.get(name) for name in types]
+        if not types or any(check is None for check in checks):
             errors.append(f"{path}: schema uses unsupported type {expected!r}")
             return
-        if not check(instance):
+        if not any(check(instance) for check in checks):
             errors.append(
                 f"{path}: expected type {expected!r}, got {type(instance).__name__}"
             )
             return
 
-    if "const" in schema and instance != schema["const"]:
+    if "const" in schema and not json_equal(instance, schema["const"]):
         errors.append(f"{path}: expected const {schema['const']!r}, got {instance!r}")
 
     enum = schema.get("enum")
-    if enum is not None and instance not in enum:
+    if enum is not None and not any(json_equal(instance, option) for option in enum):
         errors.append(f"{path}: value {instance!r} is not one of {enum!r}")
 
     if isinstance(instance, dict):
@@ -77,9 +94,18 @@ def validate_node(instance, schema, path, errors):
         if isinstance(items, dict):
             for index, value in enumerate(instance):
                 validate_node(value, items, f"{path}[{index}]", errors)
+        elif isinstance(items, list):
+            # Tuple validation (draft-07); items beyond the tuple stay allowed
+            # unless additionalItems says otherwise, which this subset skips.
+            for index, value in enumerate(instance):
+                if index < len(items) and isinstance(items[index], dict):
+                    validate_node(value, items[index], f"{path}[{index}]", errors)
 
 
 def is_iso_timestamp(value):
+    """ISO 8601 moment — date and time, e.g. 2026-11-02T12:00:00Z."""
+    if not TIMESTAMP_RE.match(value):
+        return False
     try:
         datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
@@ -88,8 +114,9 @@ def is_iso_timestamp(value):
 
 
 def is_iso_date(value):
-    if is_iso_timestamp(value):
-        return True
+    """ISO 8601 calendar date only, e.g. 2026-11-02."""
+    if not DATE_RE.match(value):
+        return False
     try:
         date.fromisoformat(value)
     except ValueError:
