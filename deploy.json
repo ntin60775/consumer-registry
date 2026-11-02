@@ -1,0 +1,8 @@
+{
+  "contract_version": 1,
+  "strategy": "replace",
+  "mappings": [
+    { "from": "skills/consumer-registry", "to": ".zcode/skills/consumer-registry" }
+  ],
+  "on_drift": "fail"
+}

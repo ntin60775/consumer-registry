@@ -1,0 +1,7 @@
+{
+  "name": "consumer-registry",
+  "version": "0.1.0",
+  "description": "Реестр потребителей проекта: машино-локальный .zcode/registry.local.json вне git — кто и на чём потребляет проект, append-only журналы раскаток и приёмок, followups перед следующей поставкой. Контракт consumer-registry/1. Репо-заглушка: состав в реализации, спека — ишью ntin60775/sot-zcode-marketplace#7.",
+  "license": "MIT",
+  "skills": "./skills"
+}
