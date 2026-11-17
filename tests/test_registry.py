@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""Plugin tests for consumer-registry — stdlib-only, no external dependencies.
+"""Bundle tests for consumer-registry — stdlib-only, no external dependencies.
 
-Six checks from issue ntin60775/sot-zcode-marketplace#7:
+Six checks adapted to the DSH-native bundle layout (ticket deliver/02);
+the contract expectations stay verbatim from issue
+ntin60775/sot-zcode-marketplace#7:
 1. schema and template are valid JSON; the schema declares draft-07;
-2. the template passes scripts/registry_check.py;
-3. the template's keys cover the schema's required keys, and the schema's
-   required lists match the contract verbatim;
-4. gitignore.snippet contains a whole line .zcode/registry.local.json;
-5. SKILL.md frontmatter: slots name/description/when_to_use/license/metadata,
-   description <= 1024 chars, trigger in the first ~250 chars;
+2. the template passes the bundle validator scripts/registry_check.py,
+   with the default schema resolution and with an explicit schema argument;
+3. the schema const and required lists match the contract verbatim, and the
+   template's keys cover the schema's required keys;
+4. the ZCode channel is removed: gitignore.snippet carries a whole line
+   .agents/registry.local.json, no bundle file mentions zcode, and the
+   channel files (.zcode-plugin/, deploy.json) are gone;
+5. SKILL.md frontmatter follows the DSH idiom (name/description),
+   description <= 1024 chars, trigger in the first ~250 chars, and the
+   description names the new home .agents/registry.local.json;
 6. the validator rejects: a foreign schema const, a result outside the enum,
    a consumer without kind/version/state, a non-ISO updated_at — and accepts
    a filled registry (positive control).
@@ -26,11 +32,12 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SCHEMA_PATH = ROOT / "templates" / "registry.schema.json"
-TEMPLATE_PATH = ROOT / "templates" / "registry.template.json"
-SNIPPET_PATH = ROOT / "templates" / "gitignore.snippet"
-SKILL_PATH = ROOT / "skills" / "consumer-registry" / "SKILL.md"
-VALIDATOR_PATH = ROOT / "scripts" / "registry_check.py"
+BUNDLE = ROOT / "skills" / "consumer-registry"
+SCHEMA_PATH = BUNDLE / "templates" / "registry.schema.json"
+TEMPLATE_PATH = BUNDLE / "templates" / "registry.template.json"
+SNIPPET_PATH = BUNDLE / "templates" / "gitignore.snippet"
+SKILL_PATH = BUNDLE / "SKILL.md"
+VALIDATOR_PATH = BUNDLE / "scripts" / "registry_check.py"
 
 failures = []
 
@@ -52,12 +59,11 @@ def load_json(path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def run_validator(target):
-    return subprocess.run(
-        [sys.executable, str(VALIDATOR_PATH), str(target)],
-        capture_output=True,
-        text=True,
-    )
+def run_validator(target, schema=None):
+    argv = [sys.executable, str(VALIDATOR_PATH), str(target)]
+    if schema is not None:
+        argv.append(str(schema))
+    return subprocess.run(argv, capture_output=True, text=True)
 
 
 def run_validator_on(registry):
@@ -87,11 +93,18 @@ def check_2():
         f"validator rejected the template (exit {result.returncode}):\n"
         f"{result.stdout}{result.stderr}"
     )
+    # The validator accepts an explicit schema path as the second argument.
+    explicit = run_validator(TEMPLATE_PATH, SCHEMA_PATH)
+    assert explicit.returncode == 0, (
+        f"validator rejected the template with an explicit schema "
+        f"(exit {explicit.returncode}):\n{explicit.stdout}{explicit.stderr}"
+    )
 
 
-# Required lists of the contract, verbatim from issue #7 — an expected value
-# independent of the schema file, so a weakened schema cannot pass by
-# matching a weakened template.
+# Contract pins, verbatim from issue #7 — expected values independent of the
+# schema file, so a weakened schema cannot pass by matching a weakened
+# template. The const is part of the contract: consumer-registry/1.
+CONTRACT_CONST = "consumer-registry/1"
 CONTRACT_REQUIRED = {
     "$": ["schema", "machine", "project", "updated_at", "consumers", "deploy_log"],
     "$.machine": ["hostname"],
@@ -162,6 +175,10 @@ def sample_registry(template):
 def check_3():
     schema = load_json(SCHEMA_PATH)
     template = load_json(TEMPLATE_PATH)
+    const = schema["properties"]["schema"].get("const")
+    assert const == CONTRACT_CONST, (
+        f"schema const is {const!r}, the contract says {CONTRACT_CONST!r}"
+    )
     actual = schema_required(schema)
     for node, expected in CONTRACT_REQUIRED.items():
         assert actual[node] == expected, (
@@ -189,8 +206,17 @@ def check_3():
 
 def check_4():
     text = SNIPPET_PATH.read_text(encoding="utf-8")
-    line_re = re.compile(r"^\s*\.zcode/registry\.local\.json\s*$", re.MULTILINE)
-    assert line_re.search(text), "snippet misses a whole line .zcode/registry.local.json"
+    line_re = re.compile(r"^\s*\.agents/registry\.local\.json\s*$", re.MULTILINE)
+    assert line_re.search(text), "snippet misses a whole line .agents/registry.local.json"
+    # The ZCode channel is removed: no bundle content mentions it, and the
+    # marketplace channel files are gone from the repo.
+    for path in sorted(BUNDLE.rglob("*")):
+        if not path.is_file():
+            continue
+        content = path.read_text(encoding="utf-8").lower()
+        assert "zcode" not in content, f"bundle file mentions zcode: {path}"
+    assert not (ROOT / ".zcode-plugin").exists(), ".zcode-plugin/ is still present"
+    assert not (ROOT / "deploy.json").exists(), "deploy.json is still present"
 
 
 BLOCK_SCALARS = (">", ">-", ">+", "|", "|-", "|+")
@@ -218,36 +244,22 @@ def parse_frontmatter(text):
     return slots
 
 
-def parse_flow_map(text):
-    inner = text.strip()
-    if inner.startswith("{") and inner.endswith("}"):
-        inner = inner[1:-1]
-    mapping = {}
-    for part in inner.split(","):
-        pair = part.split(":", 1)
-        if len(pair) == 2:
-            mapping[pair[0].strip()] = pair[1].strip()
-    return mapping
-
-
 def check_5():
     slots = parse_frontmatter(SKILL_PATH.read_text(encoding="utf-8"))
-    for slot in ("name", "description", "when_to_use", "license", "metadata"):
+    # DSH idiom: the catalog routes by name/description.
+    for slot in ("name", "description"):
         assert slot in slots, f"frontmatter misses slot {slot!r}"
+    assert slots["name"] == "consumer-registry", (
+        f"frontmatter name is {slots['name']!r}, expected 'consumer-registry'"
+    )
     description = slots["description"]
     assert len(description) <= 1024, f"description is {len(description)} chars > 1024"
     head = description[:250].lower()
     assert "реестр" in head or "registry" in head, (
         "no trigger word in the first ~250 chars of description"
     )
-    assert slots["license"] == "MIT", f"license is {slots['license']!r}, expected MIT"
-    metadata = parse_flow_map(slots["metadata"])
-    assert metadata.get("concern") == "process", (
-        f"metadata concern is {metadata.get('concern')!r}, expected 'process'"
-    )
-    assert metadata.get("contract") == "consumer-registry/1", (
-        f"metadata contract is {metadata.get('contract')!r}, "
-        "expected 'consumer-registry/1'"
+    assert ".agents/registry.local.json" in description, (
+        "description does not name the new home .agents/registry.local.json"
     )
 
 
@@ -295,10 +307,10 @@ def check_6():
 def main():
     print(f"consumer-registry tests — root {ROOT}")
     run_check(1, "schema and template are valid JSON, schema declares draft-07", check_1)
-    run_check(2, "template passes scripts/registry_check.py", check_2)
-    run_check(3, "schema required matches the contract, template covers it", check_3)
-    run_check(4, "gitignore.snippet contains .zcode/registry.local.json", check_4)
-    run_check(5, "SKILL.md frontmatter slots, limits and trigger", check_5)
+    run_check(2, "template passes the bundle validator (default and explicit schema)", check_2)
+    run_check(3, "schema const and required match the contract, template covers them", check_3)
+    run_check(4, "ZCode channel removed: snippet .agents line, no zcode in bundle", check_4)
+    run_check(5, "SKILL.md DSH frontmatter: name/description, limits, trigger, home path", check_5)
     run_check(6, "validator accepts a filled registry, rejects the negative probes", check_6)
     print()
     if failures:

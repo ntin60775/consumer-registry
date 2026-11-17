@@ -13,5 +13,5 @@
   "consumers": [],
   "deploy_log": [],
   "acceptance": [],
-  "notes": "Каркас: скопируй в .zcode/registry.local.json, заполни machine и project по факту. Журналы append-only: отменённый шаг — новая запись, не правка старой."
+  "notes": "Каркас: скопируй в .agents/registry.local.json, заполни machine и project по факту. Журналы append-only: отменённый шаг — новая запись, не правка старой."
 }

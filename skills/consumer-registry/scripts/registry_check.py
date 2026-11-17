@@ -5,9 +5,10 @@ Usage:
     python3 scripts/registry_check.py <registry.json> [schema.json]
 
 The schema path defaults to templates/registry.schema.json resolved relative
-to this script (works both in the repo and in a deployed plugin layout
-.zcode/registry/scripts -> .zcode/registry/templates); the second argument
-overrides it.
+to this script (works both in the repo bundle skills/consumer-registry and in
+the installed layout .agents/skills/consumer-registry, where scripts/ resolves
+the schema in ../templates/); the second argument overrides it. The registry
+file itself lives at <producer>/.agents/registry.local.json, outside git.
 
 Implements the draft-07 keyword subset used by the contract schema: type,
 const, enum, required, properties, additionalProperties, items. On top of

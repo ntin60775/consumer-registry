@@ -1,25 +1,35 @@
 ---
 name: consumer-registry
-description: "Реестр потребителей проекта — машино-локальный .zcode/registry.local.json вне git: кто и на чём потребляет проект, append-only журналы раскаток (deploy_log) и приёмок (acceptance), followups с done=false перед следующей поставкой. Контракт consumer-registry/1; схема и каркас в .zcode/registry/templates, валидатор — .zcode/registry/scripts/registry_check.py."
-when_to_use: после каждого акта поставки/раскатки/снятия у потребителя; после приёмки; перед выпуском новой версии — сверка парка потребителей и незакрытых followups; на вопрос «кто и на какой версии нас использует».
-license: MIT
-metadata: { concern: process, contract: consumer-registry/1 }
+description: "Реестр потребителей проекта — машино-локальный .agents/registry.local.json вне git: кто и на чём потребляет проект, append-only журналы раскаток (deploy_log) и приёмок (acceptance), followups с done=false перед следующей поставкой. Контракт consumer-registry/1; схема, каркас и валидатор — внутри бандла. Используй после каждого акта поставки/обновления/снятия у потребителя, после приёмки, перед выпуском новой версии — сверка парка и незакрытых followups, и на вопрос «кто и на какой версии нас использует»."
 ---
 
 # Реестр потребителей проекта
 
 Машино-локальный реестр потребителей ПРОЕКТА (producer-side): кто и на чём
 потребляет проект, акты раскаток и приёмок, незакрытые обязательства.
-Файл — `<проект>/.zcode/registry.local.json`, контракт `consumer-registry/1`;
-живёт вне git и не переносится между машинами. Схема и каркас —
-`.zcode/registry/templates/`, валидатор —
-`.zcode/registry/scripts/registry_check.py` (stdlib-only).
+Файл — `<продюсер>/.agents/registry.local.json`, контракт
+`consumer-registry/1`; живёт вне git и не переносится между машинами.
+Бандл самонесущий: схема и каркас — `templates/` бандла, валидатор —
+`scripts/registry_check.py` бандла (stdlib-only). В установленном виде
+пути — `.agents/skills/consumer-registry/templates/` и
+`.agents/skills/consumer-registry/scripts/registry_check.py`.
 
-Начало ведения: скопируй каркас
-`.zcode/registry/templates/registry.template.json` в
-`.zcode/registry.local.json`, заполни `machine` и `project` по факту,
-добавь в `.gitignore` строку из
-`.zcode/registry/templates/gitignore.snippet`.
+## Старт ведения
+
+Шаг идемпотентен: повторный старт не меняет ни файл реестра, ни
+`.gitignore` (diff пуст, строка не дублируется).
+
+1. Файла `<продюсер>/.agents/registry.local.json` нет — скопируй каркас
+   `templates/registry.template.json` бандла в этот путь и заполни
+   `machine` (hostname, operator) и `project` (имя, путь репо) по факту.
+   Файл уже есть — ведение начато: не перезаписывай, читай и дополняй
+   существующий.
+2. В `.gitignore` продюсера нет строки `.agents/registry.local.json` —
+   добавь её из `templates/gitignore.snippet` бандла. Владение
+   построчное: чужие строки не трогай, свою не дублируй; строка уже
+   есть — ничего не делай.
+3. Предупреди оператора: **снос `.agents` уничтожает реестр**; бэкап и
+   экспорт вне v1, потеря = ручное перенаполнение.
 
 ## Ядро правил
 
@@ -39,7 +49,7 @@ metadata: { concern: process, contract: consumer-registry/1 }
 ## Проверка реестра
 
 ```sh
-python3 .zcode/registry/scripts/registry_check.py .zcode/registry.local.json
+python3 .agents/skills/consumer-registry/scripts/registry_check.py .agents/registry.local.json
 ```
 
 Валидатор проверяет реестр по схеме `consumer-registry/1` и ISO-форматы
