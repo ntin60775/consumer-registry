@@ -29,11 +29,12 @@ scripts/install.sh --check <проект>   # проверка установк�
 
 Старт ведения идемпотентен и описан в скилле `consumer-registry`:
 
-1. Скопируй каркас:
+1. Если файла `.agents/registry.local.json` нет — скопируй каркас:
    `cp .agents/skills/consumer-registry/templates/registry.template.json .agents/registry.local.json`.
+   Файл уже есть — не перезаписывай: ведение начато, читай и дополняй.
 2. Заполни `machine` (hostname, operator) и `project` (имя, путь репо) по факту.
-3. Добавь в `.gitignore` строку `.agents/registry.local.json` из
-   `templates/gitignore.snippet` бандла (чужие строки не трогай, свою не
+3. Если строки `.agents/registry.local.json` в `.gitignore` нет — добавь её
+   из `templates/gitignore.snippet` бандла (чужие строки не трогай, свою не
    дублируй).
 4. Веди реестр по правилам скилла: после каждого акта — запись в журнал и
    обновление `updated_at`.

@@ -7,14 +7,17 @@ ntin60775/sot-zcode-marketplace#7:
 1. schema and template are valid JSON; the schema declares draft-07;
 2. the template passes the bundle validator scripts/registry_check.py,
    with the default schema resolution and with an explicit schema argument;
+   a foreign const in the explicit schema rejects the template (can-fail
+   pin of the override);
 3. the schema const and required lists match the contract verbatim, and the
    template's keys cover the schema's required keys;
-4. the ZCode channel is removed: gitignore.snippet carries a whole line
-   .agents/registry.local.json, no bundle file mentions zcode, and the
-   channel files (.zcode-plugin/, deploy.json) are gone;
+4. the ZCode channel is removed: no bundle file mentions zcode (bytecode
+   excluded), the channel files (.zcode-plugin/, deploy.json) are gone, and
+   gitignore.snippet carries a whole line .agents/registry.local.json;
 5. SKILL.md frontmatter follows the DSH idiom (name/description),
-   description <= 1024 chars, trigger in the first ~250 chars, and the
-   description names the new home .agents/registry.local.json;
+   description <= 500 chars (project limit), trigger in the first ~250 chars,
+   the description names the new home .agents/registry.local.json, and the
+   start step declares idempotence and the .agents removal warning;
 6. the validator rejects: a foreign schema const, a result outside the enum,
    a consumer without kind/version/state, a non-ISO updated_at — and accepts
    a filled registry (positive control).
@@ -99,6 +102,23 @@ def check_2():
         f"validator rejected the template with an explicit schema "
         f"(exit {explicit.returncode}):\n{explicit.stdout}{explicit.stderr}"
     )
+    # Can-fail pin of the override: a foreign const in the explicit schema
+    # must reject the template — a validator ignoring argv[2] would pass.
+    schema = load_json(SCHEMA_PATH)
+    schema["properties"]["schema"]["const"] = "consumer-registry/2"
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".json", delete=False, encoding="utf-8"
+    ) as handle:
+        json.dump(schema, handle, ensure_ascii=False)
+        foreign = Path(handle.name)
+    try:
+        rejected = run_validator(TEMPLATE_PATH, foreign)
+        assert rejected.returncode == 1 and "expected const" in rejected.stdout, (
+            f"explicit schema override did not take effect "
+            f"(exit {rejected.returncode}):\n{rejected.stdout}{rejected.stderr}"
+        )
+    finally:
+        foreign.unlink(missing_ok=True)
 
 
 # Contract pins, verbatim from issue #7 — expected values independent of the
@@ -205,18 +225,22 @@ def check_3():
 
 
 def check_4():
-    text = SNIPPET_PATH.read_text(encoding="utf-8")
-    line_re = re.compile(r"^\s*\.agents/registry\.local\.json\s*$", re.MULTILINE)
-    assert line_re.search(text), "snippet misses a whole line .agents/registry.local.json"
     # The ZCode channel is removed: no bundle content mentions it, and the
-    # marketplace channel files are gone from the repo.
+    # marketplace channel files are gone from the repo. The scan runs before
+    # the snippet read so the base tree reds on the literals themselves.
     for path in sorted(BUNDLE.rglob("*")):
         if not path.is_file():
+            continue
+        # Bytecode is not bundle content — the installer EXCLUDES it too.
+        if "__pycache__" in path.parts or path.suffix == ".pyc":
             continue
         content = path.read_text(encoding="utf-8").lower()
         assert "zcode" not in content, f"bundle file mentions zcode: {path}"
     assert not (ROOT / ".zcode-plugin").exists(), ".zcode-plugin/ is still present"
     assert not (ROOT / "deploy.json").exists(), "deploy.json is still present"
+    text = SNIPPET_PATH.read_text(encoding="utf-8")
+    line_re = re.compile(r"^\s*\.agents/registry\.local\.json\s*$", re.MULTILINE)
+    assert line_re.search(text), "snippet misses a whole line .agents/registry.local.json"
 
 
 BLOCK_SCALARS = (">", ">-", ">+", "|", "|-", "|+")
@@ -245,7 +269,8 @@ def parse_frontmatter(text):
 
 
 def check_5():
-    slots = parse_frontmatter(SKILL_PATH.read_text(encoding="utf-8"))
+    text = SKILL_PATH.read_text(encoding="utf-8")
+    slots = parse_frontmatter(text)
     # DSH idiom: the catalog routes by name/description.
     for slot in ("name", "description"):
         assert slot in slots, f"frontmatter misses slot {slot!r}"
@@ -253,11 +278,20 @@ def check_5():
         f"frontmatter name is {slots['name']!r}, expected 'consumer-registry'"
     )
     description = slots["description"]
-    assert len(description) <= 1024, f"description is {len(description)} chars > 1024"
+    # Project limit 500 (text-style.md, «Frontmatter скилла»); the DSH
+    # catalog limit 1024 is weaker and follows from it.
+    assert len(description) <= 500, f"description is {len(description)} chars > 500"
     head = description[:250].lower()
     assert "реестр" in head or "registry" in head, (
         "no trigger word in the first ~250 chars of description"
     )
+    # Criterion 5 (triage G-20, G-27): the start step declares idempotence
+    # and warns that removing .agents destroys the registry, backup outside v1.
+    assert "идемпотентен" in text, "start step does not declare idempotence"
+    assert "уничтожает реестр" in text, "start step misses the .agents removal warning"
+    assert "бэкап" in text, "warning does not name backup outside v1"
+    # New-path pin (triage G-21, spec decision 4): the description names the
+    # new home; the schema/template/docstring pins live in checks 3 and 4.
     assert ".agents/registry.local.json" in description, (
         "description does not name the new home .agents/registry.local.json"
     )
@@ -307,10 +341,10 @@ def check_6():
 def main():
     print(f"consumer-registry tests — root {ROOT}")
     run_check(1, "schema and template are valid JSON, schema declares draft-07", check_1)
-    run_check(2, "template passes the bundle validator (default and explicit schema)", check_2)
+    run_check(2, "template passes the bundle validator (default, explicit, foreign schema)", check_2)
     run_check(3, "schema const and required match the contract, template covers them", check_3)
-    run_check(4, "ZCode channel removed: snippet .agents line, no zcode in bundle", check_4)
-    run_check(5, "SKILL.md DSH frontmatter: name/description, limits, trigger, home path", check_5)
+    run_check(4, "ZCode channel removed: no zcode in bundle, snippet .agents line", check_4)
+    run_check(5, "SKILL.md DSH frontmatter and start step: idempotence, warning, home path", check_5)
     run_check(6, "validator accepts a filled registry, rejects the negative probes", check_6)
     print()
     if failures:
