@@ -20,7 +20,8 @@ gitignore-сниппет, `scripts/registry_check.py` — stdlib-only валид
 - живые реестры `registry.local.json` живут вне git — в репо их нет;
 - имена потребителей в репо не попадают;
 - скрипты и тесты — stdlib-only Python 3;
-- `deploy_log` и `acceptance` — append-only: отменённый шаг — новая запись;
+- `deploy_log` — append-only: отменённый шаг — новая запись; `acceptance`
+  не ведётся (поле схемы оставлено для чтения старых реестров);
 - ломающие изменения контракта — только `consumer-registry/2`.
 
 ## Локальный OntoShip-флоу

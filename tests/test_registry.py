@@ -180,15 +180,6 @@ def sample_registry(template):
             ],
         }
     )
-    full["acceptance"].append(
-        {
-            "at": "2026-11-02T13:00:00Z",
-            "consumer": "example-project",
-            "kind": "smoke",
-            "result": "green",
-            "details": "positive control",
-        }
-    )
     return full
 
 
@@ -222,6 +213,13 @@ def check_3():
 
     walk(schema, template, "$")
     walk(schema, sample_registry(template), "$+samples")
+
+    # Решение оператора: журнал приёмок не ведётся. Каркас нового реестра
+    # его не несёт, поле схемы остаётся ради чтения старых реестров.
+    assert "acceptance" not in template, "template must not carry acceptance"
+    assert "не заполняется" in schema["properties"]["acceptance"]["description"], (
+        "schema must mark acceptance as legacy/not filled"
+    )
 
 
 def check_4():
@@ -305,6 +303,23 @@ def check_6():
     assert ok.returncode == 0, (
         f"validator rejected the positive control (exit {ok.returncode}):\n"
         f"{ok.stdout}{ok.stderr}"
+    )
+
+    # Чтение старых реестров: запись приёмки в файле версии 1 остаётся
+    # валидной, хотя новых журнал не пишет.
+    legacy = json.loads(json.dumps(full))
+    legacy["acceptance"] = [
+        {
+            "at": "2026-11-02T13:00:00Z",
+            "consumer": "example-project",
+            "kind": "smoke",
+            "result": "green",
+        }
+    ]
+    leg = run_validator_on(legacy)
+    assert leg.returncode == 0, (
+        f"validator rejected a legacy registry with acceptance (exit {leg.returncode}):\n"
+        f"{leg.stdout}{leg.stderr}"
     )
 
     def probe(title, bad, fragment):

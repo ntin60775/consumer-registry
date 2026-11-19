@@ -12,6 +12,5 @@
   "updated_at": "1970-01-01T00:00:00Z",
   "consumers": [],
   "deploy_log": [],
-  "acceptance": [],
   "notes": "Каркас: скопируй в .agents/registry.local.json, заполни machine и project по факту. Журналы append-only: отменённый шаг — новая запись, не правка старой."
 }
