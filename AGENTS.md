@@ -15,6 +15,14 @@ gitignore-сниппет, `scripts/registry_check.py` — stdlib-only валид
   `python3 skills/consumer-registry/scripts/registry_check.py skills/consumer-registry/templates/registry.template.json`;
 - установка: `scripts/install.sh --check <проект>` — `check: ok`.
 
+## Версии и релизы
+
+- версия — тег `vX.Y.Z` на tip `main` после зелёных проверок; тег не
+  переносится, ошибка чинится новым тегом;
+- слом контракта — новый `consumer-registry/N+1` и MAJOR, не правка
+  полей на месте;
+- правки вне бандла (доки, тесты, процессы) тега не требуют.
+
 ## Границы
 
 - живые реестры `registry.local.json` живут вне git — в репо их нет;

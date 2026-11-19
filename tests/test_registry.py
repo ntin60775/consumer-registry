@@ -353,6 +353,30 @@ def check_6():
     probe("updated_at without a time part", bad, "not an ISO 8601 timestamp")
 
 
+def check_7():
+    """release rules are declared, and the version lives only in git.
+
+    Цели: spec — README «Версии и релизы»; invariant — бандл не пинит
+    версию литералом (иначе тег и текст разойдутся молча).
+    """
+    readme = re.sub(r"\s+", " ", (ROOT / "README.md").read_text(encoding="utf-8")).lower()
+    agents = re.sub(r"\s+", " ", (ROOT / "AGENTS.md").read_text(encoding="utf-8")).lower()
+    for phrase in ("## версии и релизы", "тег не переносится",
+                   "consumer-registry/n+1", "ls-remote --tags"):
+        assert phrase in readme, f"README misses release rule {phrase!r}"
+    assert "тег не переносится" in agents, "AGENTS misses the tag rule"
+    assert "consumer-registry/n+1" in agents, "AGENTS misses the contract bump rule"
+
+    version_re = re.compile(r"\bv\d+\.\d+\.\d+\b")
+    for path in sorted(BUNDLE.rglob("*")):
+        if not path.is_file() or "__pycache__" in path.parts:
+            continue
+        if path.suffix == ".pyc":
+            continue
+        hit = version_re.search(path.read_text(encoding="utf-8"))
+        assert hit is None, f"bundle pins a version literal: {path}: {hit.group(0)}"
+
+
 def main():
     print(f"consumer-registry tests — root {ROOT}")
     run_check(1, "schema and template are valid JSON, schema declares draft-07", check_1)
@@ -361,11 +385,12 @@ def main():
     run_check(4, "ZCode channel removed: no zcode in bundle, snippet .agents line", check_4)
     run_check(5, "SKILL.md DSH frontmatter and start step: idempotence, warning, home path", check_5)
     run_check(6, "validator accepts a filled registry, rejects the negative probes", check_6)
+    run_check(7, "release rules declared, version lives only in git", check_7)
     print()
     if failures:
-        print(f"FAILED: {len(failures)} of 6 checks")
+        print(f"FAILED: {len(failures)} of 7 checks")
         return 1
-    print("PASSED: 6/6 checks green")
+    print("PASSED: 7/7 checks green")
     return 0
 
 
