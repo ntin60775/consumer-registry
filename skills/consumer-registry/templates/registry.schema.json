@@ -104,9 +104,10 @@
             "enum": [
               "active",
               "stale",
+              "planned",
               "removed"
             ],
-            "description": "stale — потребитель жив, версия отстала; removed — снят (запись остаётся)"
+            "description": "active — ядро поставлено и актуально; stale — потребитель жив, версия отстала (раскладка ядра старая); planned — зарегистрирован в парке без поставки, версия unpinned; removed — снят (запись остаётся)"
           },
           "note": {
             "type": "string"
