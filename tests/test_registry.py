@@ -377,6 +377,21 @@ def check_7():
         assert hit is None, f"bundle pins a version literal: {path}: {hit.group(0)}"
 
 
+def check_8():
+    """write rule is declared in the core rules: the ledger is edited under
+    flock, written atomically, and a stale lock is an operator action.
+
+    Цели: spec — SKILL.md «Ядро правил»; invariant — параллельные писатели
+    ждут замок, а не перетирают акт друг друга.
+    """
+    text = re.sub(r"\s+", " ", (BUNDLE / "SKILL.md").read_text(encoding="utf-8"))
+    core = text.split("## Ядро правил", 1)[1].split("## ", 1)[0]
+    for phrase in ("flock", "<файл>.lock",
+                   "flock -w 10 .agents/registry.local.json.lock",
+                   "атомарно", "mv", "брошенный замок"):
+        assert phrase in core, f"core rules miss write-lock phrase {phrase!r}"
+
+
 def main():
     print(f"consumer-registry tests — root {ROOT}")
     run_check(1, "schema and template are valid JSON, schema declares draft-07", check_1)
@@ -386,11 +401,12 @@ def main():
     run_check(5, "SKILL.md DSH frontmatter and start step: idempotence, warning, home path", check_5)
     run_check(6, "validator accepts a filled registry, rejects the negative probes", check_6)
     run_check(7, "release rules declared, version lives only in git", check_7)
+    run_check(8, "write rule: flock on <file>.lock, atomic rename, orphan lock is operator's", check_8)
     print()
     if failures:
-        print(f"FAILED: {len(failures)} of 7 checks")
+        print(f"FAILED: {len(failures)} of 8 checks")
         return 1
-    print("PASSED: 7/7 checks green")
+    print("PASSED: 8/8 checks green")
     return 0
 
 
